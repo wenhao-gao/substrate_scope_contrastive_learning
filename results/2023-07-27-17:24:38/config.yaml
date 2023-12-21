@@ -1,0 +1,18 @@
+!!python/object/new:utils.Objdict
+dictitems:
+  alpha: 1.0
+  batch_size: 4096
+  beta: 0.0
+  distance: snr
+  gamma: 4.022879258650723
+  hidden_channels: 64
+  lr: 5.0e-05
+  lr_decay: 0.999
+  margin: 1.906408074987083
+  max_norm: 5.0
+  momentum: 0.9
+  num_layers: 5
+  optimizer: adam
+  pool: c
+  smooth_loss: true
+  triplets_per_anchor: 16

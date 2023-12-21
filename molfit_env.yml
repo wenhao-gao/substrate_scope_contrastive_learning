@@ -1,0 +1,39 @@
+name: molfit
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipython=8.12.2
+  - matplotlib
+  - numpy=1.24.3
+  - pandas=2.0.1
+  - pillow=10.0.0
+  - pip=23.2
+  - python=3.8.16
+  - pip:
+      - ase==3.22.1
+      - auto-sklearn==0.15.0
+      - bayesian-optimization==1.4.3
+      - datamol==0.11.2
+      - ipdb==0.13.13
+      - molfeat==0.9.2
+      - molplotly==1.1.7
+      - mordredcommunity==2.0.2
+      - morfeus-ml==0.7.2
+      - plotly==5.15.0
+      - pymongo==4.4.0
+      - pytdc==0.4.0
+      - pytorch-metric-learning==2.1.2
+      - pyyaml==6.0
+      - ray==2.5.1
+      - rdchiral==1.1.0
+      - rdkit==2023.3.1
+      - rdkit-pypi==2022.9.5
+      - scikit-learn==0.24.2
+      - scipy==1.10.1
+      - seaborn==0.12.2
+      - selfies==2.1.1
+      - tqdm==4.65.0
+      - umap-learn==0.5.3
+      - wandb==0.15.3
+      - xgboost==1.7.5

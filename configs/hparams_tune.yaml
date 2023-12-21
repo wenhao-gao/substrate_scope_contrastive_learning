@@ -1,0 +1,15 @@
+name: substrate_metric_learning
+method: random
+metric:
+  goal: maximize
+  name: max_r2
+parameters:
+  beta: 
+    values: [1.0, 0.5, 0.25, 0.1]
+  gamma: 
+    values: [0.5, 0.75, 1.0, 1.25]
+  margin: 
+    values: [0.5, 0.75, 1.0, 1.25]
+  distance:
+    values: ['l1', 'l2', 'cosine', 'snr']
+

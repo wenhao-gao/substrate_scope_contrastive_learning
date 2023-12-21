@@ -1,0 +1,8 @@
+name: substrate_metric_learning_debug
+method: grid
+metric:
+  goal: maximize
+  name: max_r2
+parameters:
+  beta:
+    values: [0.1, 0.5]
