@@ -77,11 +77,18 @@ def get_random_triplet_indices_shn(labels, ref_labels=None, t_per_anchor=None, w
             n = n_inds[n_]
         else:
             # Sample the negative indices uniformly.
+            atm_cls_dict = {
+                0: list(set((atm_cls == 0).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist())),
+                1: list(set((atm_cls == 1).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist())),
+                2: list(set((atm_cls == 2).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist())),
+                3: list(set((atm_cls == 3).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist()))
+            }
             n_ = []
             no_negatives = []
             target_classes = atm_cls[a]
             for i, cls in enumerate(target_classes):
-                allow_negatives = list(set((atm_cls == cls).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist()))
+                # allow_negatives = list(set((atm_cls == cls).nonzero(as_tuple=True)[0].tolist()) & set(n_inds.tolist()))
+                allow_negatives = atm_cls_dict[cls.item()]
                 if len(allow_negatives) == 0:
                     no_negatives.append(i)
                     n_.append(0)

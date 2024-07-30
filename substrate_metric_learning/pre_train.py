@@ -89,18 +89,40 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, config.batch_size, shuffle=False)
 
     data = train_dataset[0]
-    model_pretrained = Net(data.x.shape[1], config.hidden_channels, 1, config.num_layers, pool=config.pool).to(device)
-    for m in model_pretrained.modules():
+
+    if config.model == 'gin':
+        model = Net(data.x.shape[1], config.hidden_channels, 1, config.num_layers, pool=config.pool).to(device)
+    elif config.model == 'gt':
+        net = GraphTransformer(
+            dim=data.x.shape[1],
+            depth=config.num_layers,
+            dim_head=config.hidden_channels,
+            edge_dim=14,
+            heads=4,
+            gated_residual=True,
+            with_feedforwards=True,
+            norm_edges=True,
+            rel_pos_emb=True,
+            accept_adjacency_matrix=True,
+            out_channels=1,
+            pool=config.pool
+        ).to(device)
+    else:
+        raise ValueError('Invalid model type')
+
+    for m in model.modules():
         if isinstance(m, (torch.nn.Linear, torch.nn.Conv1d)):
             torch.nn.init.kaiming_normal_(m.weight)
             if m.bias is not None:
                 torch.nn.init.zeros_(m.bias)
-    torch.save(model_pretrained.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{0}.pth"))
+    torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{0}.pth"))
 
     if config.optimizer == 'adam':
-        optimizer = torch.optim.Adam(model_pretrained.parameters(), lr=config.lr, betas=(config.momentum, 0.999))
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr, betas=(config.momentum, 0.999))
+    elif config.optimizer == 'adamw':
+        optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, betas=(config.momentum, 0.999))
     elif config.optimizer == 'sgd':
-        optimizer = torch.optim.SGD(model_pretrained.parameters(), lr=config.lr, momentum=config.momentum)
+        optimizer = torch.optim.SGD(model.parameters(), lr=config.lr, momentum=config.momentum)
     else:
         raise ValueError('Invalid optimizer type')
     
@@ -143,7 +165,7 @@ if __name__ == "__main__":
 
     for epoch in range(1, FLAGS.epochs + 1):
 
-        model_pretrained.train()
+        model.train()
         loss_list = []
         loss_ap_list = []
         loss_an_list = []
@@ -155,21 +177,21 @@ if __name__ == "__main__":
             smiles_list = data.smiles
             atm_cls = data.atm_cls
             optimizer.zero_grad()
-            out, embeddings = model_pretrained(data.x, data.edge_index, data.batch, data.atm_idx)
+            out, embeddings = model(data.x, data.edge_index, data.batch, data.atm_idx)
             loss, loss_ap, loss_an = loss_func(embeddings, values, labels, smiles_list, atm_cls)
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(model_pretrained.parameters(), max_norm=config.max_norm)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
             optimizer.step()
             loss_list.append(loss.detach().cpu().item())
             loss_ap_list.append(loss_ap.detach().cpu().item())
             loss_an_list.append(loss_an.detach().cpu().item())
-            grad_list.append(check_grad(model_pretrained))
+            grad_list.append(check_grad(model))
         scheduler_lr.step()
-            # print(f"Batch Index: {batch_idx}, Loss: {loss.detach().cpu().item():.4f}, Grad: {check_grad(model_pretrained):.4f}")
+            # print(f"Batch Index: {batch_idx}, Loss: {loss.detach().cpu().item():.4f}, Grad: {check_grad(model):.4f}")
 
         r2_doyle, mut_info_doyle, r2_hammett, mut_info_hammett, r2_charge, mut_info_charge, r2_nmr, mut_info_nmr, f_test_doyle, f_test_hammett, f_test_charge, f_test_nmr \
-            = evaluate(model_pretrained, device)
+            = evaluate(model, device)
         sum_r2 = r2_doyle + r2_hammett + r2_charge + r2_nmr
         sum_mi = mut_info_doyle + mut_info_hammett + mut_info_charge + mut_info_nmr
         sum_ft = f_test_doyle + f_test_hammett + f_test_charge + f_test_nmr
@@ -217,14 +239,14 @@ if __name__ == "__main__":
                 })
 
             if sum_r2 > 1.5 and epoch > 0:
-                torch.save(model_pretrained.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
             if sum_mi > 2.0 and epoch > 0:
-                torch.save(model_pretrained.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_mi_{sum_mi:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_mi_{sum_mi:.3f}.pth"))
             if sum_ft > 86.0 and epoch > 0:
-                torch.save(model_pretrained.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_ft_{sum_ft:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_ft_{sum_ft:.3f}.pth"))
 
     print(f"Finished training in {time.time() - time_start} seconds")
 
     if ~FLAGS.debug:
-        torch.save(model_pretrained.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
+        torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
         run.finish()
