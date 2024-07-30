@@ -6,10 +6,18 @@ from rdkit import Chem
 from rdkit import Chem, RDLogger
 from torch_geometric.data import Data
 from numba import jit
+from ipdb import set_trace as st
 
 ######################################################################################################################################################
 ########################### taken from https://github.com/chemprop/chemprop/blob/master/chemprop/features/featurization.py ###########################
 ######################################################################################################################################################
+
+halogen2index={
+    'F': 0,
+    'Cl': 1,
+    'Br': 2,
+    'I': 3
+}
 
 class Featurization_parameters:
     """
@@ -275,6 +283,8 @@ def smiles_to_graph_substrate(smiles: str, s: int, y: float, atm_idx=None, with_
     [a.SetAtomMapNum(0) for a in mol.GetAtoms()]
     smiles_canonical = Chem.MolToSmiles(mol)
 
+    atm_cls = halogen2index[mol.GetAtomWithIdx(int(atm_idx[1])).GetSymbol()]
+
     if atm_idx is not None:
         return Data(
             x=x, 
@@ -282,8 +292,20 @@ def smiles_to_graph_substrate(smiles: str, s: int, y: float, atm_idx=None, with_
             edge_attr=torch.squeeze(edge_attr), 
             scope_id=torch.tensor([s]), 
             y=torch.tensor([y], dtype=torch.float32), 
-            atm_idx=torch.tensor([atm_idx]),
+            atm_idx=torch.tensor([atm_idx[0]]),
+            atm_cls=torch.tensor([atm_cls]),
             smiles=smiles_canonical
         )
     else:
-        return Data(x=x, edge_index=edge_index, edge_attr=torch.squeeze(edge_attr), scope_id=torch.tensor([s]), y=torch.tensor([y], dtype=torch.float32))
+        return Data(
+            x=x, 
+            edge_index=edge_index, 
+            edge_attr=torch.squeeze(edge_attr), 
+            scope_id=torch.tensor([s]), 
+            y=torch.tensor([y], dtype=torch.float32)
+        )
+
+###### 0: F
+###### 1: Cl
+###### 2: Br
+###### 3: I

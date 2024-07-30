@@ -14,3 +14,4 @@ alpha: 1.0
 gamma: 4.022879258650723
 beta: 0.6120957227224214
 margin: 1.906408074987083
+same_halogen_negative: False

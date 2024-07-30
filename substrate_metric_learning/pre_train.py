@@ -59,12 +59,10 @@ if __name__ == "__main__":
     if FLAGS.dataset_path[-4:] == '.csv':
         data = pd.read_csv(FLAGS.dataset_path)
 
+        if FLAGS.debug:
+            data = data[:1000]
+
         if config.pool == 'c':
-            train_dataset = [smiles_to_graph_substrate(smiles=data['Arylhalide'][ind], 
-                                                    s=data['ScopeID'][ind], 
-                                                    y=data['Yield'][ind]/100, 
-                                                        atm_idx=[data['aroma_c_index'][ind]]) for ind in range(len(data))]
-        elif config.pool == 'cx':
             train_dataset = [smiles_to_graph_substrate(smiles=data['Arylhalide'][ind], 
                                                     s=data['ScopeID'][ind], 
                                                     y=data['Yield'][ind]/100, 
@@ -84,6 +82,7 @@ if __name__ == "__main__":
     if FLAGS.debug:
         # data = data[:2000]
         FLAGS.epochs = 2
+        config.batch_size = 128
 
     print(f"Using config: {config}")
    
@@ -106,7 +105,6 @@ if __name__ == "__main__":
         raise ValueError('Invalid optimizer type')
     
     scheduler_lr = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=config.lr_decay)
-
 
     swap = False
 
@@ -133,6 +131,7 @@ if __name__ == "__main__":
         triplets_per_anchor=config.triplets_per_anchor,
         distance=distance_class,
         swap=swap,
+        same_halogen_negative=config.same_halogen_negative,
         alpha=config.alpha,
         beta=config.beta,
         gamma=config.gamma,
@@ -154,9 +153,10 @@ if __name__ == "__main__":
             labels = data.scope_id
             values = data.y
             smiles_list = data.smiles
+            atm_cls = data.atm_cls
             optimizer.zero_grad()
             out, embeddings = model_pretrained(data.x, data.edge_index, data.batch, data.atm_idx)
-            loss, loss_ap, loss_an = loss_func(embeddings, values, labels, smiles_list)
+            loss, loss_ap, loss_an = loss_func(embeddings, values, labels, smiles_list, atm_cls)
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(model_pretrained.parameters(), max_norm=config.max_norm)

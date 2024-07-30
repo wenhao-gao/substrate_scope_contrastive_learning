@@ -7,12 +7,12 @@ from pytorch_metric_learning.utils import common_functions as c_f
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 from pytorch_metric_learning.utils.module_with_records_and_reducer import ModuleWithRecordsReducerAndDistance
 from pytorch_metric_learning.losses.mixins import EmbeddingRegularizerMixin
-from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
 from pytorch_metric_learning.distances.base_distance import BaseDistance
 from ipdb import set_trace as st
 from numba import njit
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 import warnings
+from miner_utils import convert_to_triplets_shn
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
 warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
@@ -77,6 +77,7 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
         distance=None,
         smooth_loss=False,
         triplets_per_anchor="all",
+        same_halogen_negative=False,
         alpha=1,
         beta=1,
         gamma=1,
@@ -87,6 +88,7 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
         self.swap = swap
         self.smooth_loss = smooth_loss
         self.triplets_per_anchor = triplets_per_anchor
+        self.same_halogen_negative = same_halogen_negative
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
@@ -100,12 +102,18 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
         else:
             self.device = device
         
-    def compute_loss(self, embeddings, values, labels, indices_tuple, ref_emb, ref_labels, smiles_list):
+    def compute_loss(self, embeddings, values, labels, indices_tuple, ref_emb, ref_labels, smiles_list, atm_cls):
 
         c_f.labels_or_indices_tuple_required(labels, indices_tuple)
-        indices_tuple = lmu.convert_to_triplets(
-            indices_tuple, labels, ref_labels, t_per_anchor=self.triplets_per_anchor
-        )
+        if not self.same_halogen_negative:
+            indices_tuple = lmu.convert_to_triplets(
+                indices_tuple, labels, ref_labels, t_per_anchor=self.triplets_per_anchor
+            )
+        else:
+            indices_tuple = convert_to_triplets_shn(
+                indices_tuple, labels, ref_labels, t_per_anchor=self.triplets_per_anchor, atm_cls=atm_cls
+            )
+
         anchor_idx, positive_idx, negative_idx = indices_tuple
 
         if len(anchor_idx) == 0:
@@ -176,7 +184,7 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
         return AvgNonZeroReducer()
     
     def forward(
-        self, embeddings, values, labels, smiles_list, indices_tuple=None, ref_emb=None, ref_labels=None
+        self, embeddings, values, labels, smiles_list, atm_cls, indices_tuple=None, ref_emb=None, ref_labels=None
     ):
         """
         Args:
@@ -193,7 +201,7 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
             labels = c_f.to_device(labels, embeddings)
         ref_emb, ref_labels = c_f.set_ref_emb(embeddings, labels, ref_emb, ref_labels)
         loss_dict = self.compute_loss(
-            embeddings, values, labels, indices_tuple, ref_emb, ref_labels, smiles_list
+            embeddings, values, labels, indices_tuple, ref_emb, ref_labels, smiles_list, atm_cls
         )
         self.add_embedding_regularization_to_loss_dict(loss_dict['loss'], embeddings)
         self.add_embedding_regularization_to_loss_dict(loss_dict['loss_ap'], embeddings)

@@ -65,13 +65,10 @@ data_doyle = pd.DataFrame({
     "halide_index": [_[1] for _ in temp]
 })
 
-test_doyle_dataset_cx = [smiles_to_graph(smiles=data_doyle['smiles'][ind], 
-                                      y=data_doyle['label'][ind], 
-                                      atm_idx=[data_doyle['aroma_c_index'][ind], data_doyle['halide_index'][ind]]) for ind in range(len(data_doyle))]
-
-test_doyle_dataset_c = [smiles_to_graph(smiles=data_doyle['smiles'][ind], 
-                                      y=data_doyle['label'][ind], 
-                                      atm_idx=[data_doyle['aroma_c_index'][ind]]) for ind in range(len(data_doyle))]
+test_doyle_dataset_c = [smiles_to_graph_substrate(smiles=data_doyle['smiles'][ind], 
+                                        s=0,
+                                        y=data_doyle['label'][ind], 
+                                        atm_idx=[data_doyle['aroma_c_index'][ind], data_doyle['halide_index'][ind]]) for ind in range(len(data_doyle))]
 
 
 @torch.no_grad()
@@ -80,8 +77,6 @@ def test_on_doyle(model, device):
     model.eval()
     if model.pool_method == 'c':
         test_doyle_loader = DataLoader(test_doyle_dataset_c, 64, shuffle=False)
-    elif model.pool_method == 'cx':
-        test_doyle_loader = DataLoader(test_doyle_dataset_cx, 64, shuffle=False)
     else:
         raise ValueError('Invalid pool_method type')
     
@@ -142,13 +137,10 @@ def test_on_doyle(model, device):
 
 
 data_hammett = pd.read_csv(os.path.join(os.path.dirname(__file__), "../data/Hammett_xtb.csv"))
-test_hammett_dataset_cx = [smiles_to_graph(smiles=data_hammett['SMILES'][ind], 
-                                      y=data_hammett['constant'][ind], 
-                                      atm_idx=[data_hammett['c_index'][ind], data_hammett['x_index'][ind]]) for ind in range(len(data_hammett))]
-
-test_hammett_dataset_c = [smiles_to_graph(smiles=data_hammett['SMILES'][ind], 
-                                      y=data_hammett['constant'][ind], 
-                                      atm_idx=[data_hammett['c_index'][ind]]) for ind in range(len(data_hammett))]
+test_hammett_dataset_c = [smiles_to_graph_substrate(smiles=data_hammett['SMILES'][ind], 
+                                                    s=0,
+                                                    y=data_hammett['constant'][ind], 
+                                                    atm_idx=[data_hammett['c_index'][ind], data_hammett['x_index'][ind]]) for ind in range(len(data_hammett))]
 
 
 @torch.no_grad()
@@ -156,8 +148,6 @@ def test_on_hammett(model, device):
     model.eval()
     if model.pool_method == 'c':
         test_loader = DataLoader(test_hammett_dataset_c, 64, shuffle=False)
-    elif model.pool_method == 'cx':
-        test_loader = DataLoader(test_hammett_dataset_cx, 64, shuffle=False)
     else:
         raise ValueError('Invalid pool_method type')
     
@@ -209,21 +199,16 @@ def test_on_hammett(model, device):
     return r2, mut_info, f_test
 
 data_autoqchem = pd.read_csv(os.path.join(os.path.dirname(__file__), "../data/Hammett_autoqchem.csv"))
-test_autoqchem_dataset_cx = [smiles_to_graph(smiles=data_autoqchem['SMILES'][ind], 
-                                      y=data_autoqchem['constant'][ind], 
-                                      atm_idx=[data_autoqchem['c_index'][ind], data_autoqchem['x_index'][ind]]) for ind in range(len(data_autoqchem))]
-
-test_autoqchem_dataset_c = [smiles_to_graph(smiles=data_autoqchem['SMILES'][ind], 
-                                      y=data_autoqchem['constant'][ind], 
-                                      atm_idx=[data_autoqchem['c_index'][ind]]) for ind in range(len(data_autoqchem))]
+test_autoqchem_dataset_c = [smiles_to_graph_substrate(smiles=data_autoqchem['SMILES'][ind], 
+                                        s=0,
+                                        y=data_autoqchem['constant'][ind], 
+                                        atm_idx=[data_autoqchem['c_index'][ind], data_autoqchem['x_index'][ind]]) for ind in range(len(data_autoqchem))]
 
 @torch.no_grad()
 def test_on_autoqchem_charge(model, device):
     model.eval()
     if model.pool_method == 'c':
         test_loader = DataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
-    elif model.pool_method == 'cx':
-        test_loader = DataLoader(test_autoqchem_dataset_cx, 64, shuffle=False)
     else:
         raise ValueError('Invalid pool_method type')
     
@@ -280,8 +265,6 @@ def test_on_autoqchem_nmr(model, device):
     model.eval()
     if model.pool_method == 'c':
         test_loader = DataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
-    elif model.pool_method == 'cx':
-        test_loader = DataLoader(test_autoqchem_dataset_cx, 64, shuffle=False)
     else:
         raise ValueError('Invalid pool_method type')
     
