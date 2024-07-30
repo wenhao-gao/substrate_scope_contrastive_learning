@@ -17,6 +17,7 @@ from utils import *
 from evaluate import *
 from networks import *
 from substrate_loss import *
+from loader import SC_GTDataLoader
 
 torch.autograd.set_detect_anomaly(True)
 torch.use_deterministic_algorithms(mode=True, warn_only=True)
@@ -86,24 +87,24 @@ if __name__ == "__main__":
 
     print(f"Using config: {config}")
    
-    train_loader = DataLoader(train_dataset, config.batch_size, shuffle=False)
-
-    data = train_dataset[0]
-
+    sample_data = train_dataset[0]
     if config.model == 'gin':
-        model = Net(data.x.shape[1], config.hidden_channels, 1, config.num_layers, pool=config.pool).to(device)
+        train_loader = DataLoader(train_dataset, config.batch_size, shuffle=False)
+        model = Net(sample_data.x.shape[1], config.hidden_channels, 1, config.num_layers, pool=config.pool).to(device)
     elif config.model == 'gt':
-        net = GraphTransformer(
-            dim=data.x.shape[1],
+        train_loader = SC_GTDataLoader(train_dataset, config.batch_size, shuffle=False)
+        model = GraphTransformer(
+            dim=sample_data.x.shape[1],
             depth=config.num_layers,
             dim_head=config.hidden_channels,
-            edge_dim=14,
-            heads=4,
-            gated_residual=True,
-            with_feedforwards=True,
-            norm_edges=True,
-            rel_pos_emb=True,
-            accept_adjacency_matrix=True,
+            edge_dim=sample_data.edge_attr.shape[1],
+            heads=config.num_heads,
+            gated_residual=config.gated_residual,
+            with_feedforwards=config.with_feedforwards,
+            norm_edges=config.norm_edges,
+            rel_pos_emb=config.rel_pos_emb,
+            accept_adjacency_matrix=config.accept_adjacency_matrix,
+            mlp_hidden_channels=config.mlp_hidden_channels,
             out_channels=1,
             pool=config.pool
         ).to(device)
@@ -115,6 +116,7 @@ if __name__ == "__main__":
             torch.nn.init.kaiming_normal_(m.weight)
             if m.bias is not None:
                 torch.nn.init.zeros_(m.bias)
+
     torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{0}.pth"))
 
     if config.optimizer == 'adam':
@@ -170,24 +172,49 @@ if __name__ == "__main__":
         loss_ap_list = []
         loss_an_list = []
         grad_list = []
+
         for batch_idx, data in enumerate(train_loader):
-            data = data.to(device)
-            labels = data.scope_id
-            values = data.y
-            smiles_list = data.smiles
-            atm_cls = data.atm_cls
-            optimizer.zero_grad()
-            out, embeddings = model(data.x, data.edge_index, data.batch, data.atm_idx)
+            if config.model == 'gin':
+                data = data.to(device)
+                labels = data.scope_id
+                values = data.y
+                smiles_list = data.smiles
+                atm_cls = data.atm_cls
+                optimizer.zero_grad()
+                out, embeddings = model(data.x, data.edge_index, data.batch, data.atm_idx)
+            elif config.model == 'gt':
+                nodes, edges, adj_mat, mask, values, labels, atm_idx, smiles_list, atm_cls = data
+                nodes, edges, adj_mat, mask, values, labels, atm_idx, atm_cls = \
+                    nodes.to(device), edges.to(device), adj_mat.to(device), mask.to(device), values.to(device), labels.to(device), atm_idx.to(device), atm_cls.to(device)
+                optimizer.zero_grad()
+                embeddings = model(nodes=nodes, edges=edges, adj_mat=adj_mat, mask=mask, atm_idx=atm_idx)[1]
+                # Write a loop to iterate through the batch and calculate the embeddings
+                # minibatch_size = 32
+                # embeddings = torch.zeros((nodes.size(0), sample_data.x.shape[1])).to(device)
+                # for i in range(0, nodes.size(0), minibatch_size):
+                #     minibatch_embeddings = model(
+                #         nodes=nodes[i:i+minibatch_size], 
+                #         edges=edges[i:i+minibatch_size], 
+                #         adj_mat=adj_mat[i:i+minibatch_size], 
+                #         mask=mask[i:i+minibatch_size],
+                #         atm_idx=atm_idx[i:i+minibatch_size]
+                #     )[1]
+                #     embeddings[i:i+minibatch_size] = minibatch_embeddings
+                #     torch.cuda.empty_cache()       
+            else:
+                raise ValueError('Invalid model type')
             loss, loss_ap, loss_an = loss_func(embeddings, values, labels, smiles_list, atm_cls)
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
             optimizer.step()
-            loss_list.append(loss.detach().cpu().item())
-            loss_ap_list.append(loss_ap.detach().cpu().item())
-            loss_an_list.append(loss_an.detach().cpu().item())
+            loss_list.append(loss.detach().cpu().item() * config.batch_size / len(train_dataset))
+            loss_ap_list.append(loss_ap.detach().cpu().item() * config.batch_size / len(train_dataset))
+            loss_an_list.append(loss_an.detach().cpu().item() * config.batch_size / len(train_dataset))
             grad_list.append(check_grad(model))
+
         scheduler_lr.step()
+        curr_lr = scheduler_lr.get_lr()
             # print(f"Batch Index: {batch_idx}, Loss: {loss.detach().cpu().item():.4f}, Grad: {check_grad(model):.4f}")
 
         r2_doyle, mut_info_doyle, r2_hammett, mut_info_hammett, r2_charge, mut_info_charge, r2_nmr, mut_info_nmr, f_test_doyle, f_test_hammett, f_test_charge, f_test_nmr \
@@ -206,7 +233,7 @@ if __name__ == "__main__":
             ft_max = sum_ft
         
         if FLAGS.debug:
-            print(f"Epoch: {epoch}, Loss: {sum(loss_list):.4f}, Grad: {sum(grad_list):.4f}, \
+            print(f"Epoch: {epoch}, Loss: {sum(loss_list):.4f}, Grad: {sum(grad_list):.4f}, LR: {curr_lr[0]}\
                   R2 Doyle: {r2_doyle:.4f}, Mut_info Doyle: {mut_info_doyle:.4f}, \
                   R2 Hammett: {r2_hammett:.4f}, Mut_info Hammett: {mut_info_hammett:.4f}, \
                   R2 Charge: {r2_charge:.4f}, Mut_info Hammett: {mut_info_charge:.4f}, \
@@ -218,6 +245,7 @@ if __name__ == "__main__":
                 "loss_ap": sum(loss_ap_list), 
                 "loss_an": sum(loss_an_list), 
                 "grad": sum(grad_list), 
+                "lr": curr_lr[0],
                 "r2_doyle": r2_doyle, 
                 "mut_info_doyle": mut_info_doyle,
                 "f_test_doyle": f_test_doyle,
@@ -239,14 +267,14 @@ if __name__ == "__main__":
                 })
 
             if sum_r2 > 1.5 and epoch > 0:
-                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
             if sum_mi > 2.0 and epoch > 0:
-                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_mi_{sum_mi:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{epoch}_sum_mi_{sum_mi:.3f}.pth"))
             if sum_ft > 86.0 and epoch > 0:
-                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_ft_{sum_ft:.3f}.pth"))
+                torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{epoch}_sum_ft_{sum_ft:.3f}.pth"))
 
     print(f"Finished training in {time.time() - time_start} seconds")
 
     if ~FLAGS.debug:
-        torch.save(model.state_dict(), os.path.join(FLAGS.output_path, f"gin_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
+        torch.save(model.state_dict(), os.path.join(FLAGS.output_path, config.model + f"_epoch_{epoch}_sum_r2_{sum_r2:.3f}.pth"))
         run.finish()

@@ -73,12 +73,26 @@ def get_y_pred(model, loader, device):
 @torch.no_grad()
 def get_embedding(model, loader, device):
     model.eval()
-    embeddings = []
-    for data in loader:
-        data = data.to(device)
-        _, emb = model(data.x, data.edge_index, data.batch, data.atm_idx)
-        embeddings.append(emb.cpu().numpy())
-    return np.concatenate(embeddings, axis=0)
+    if model.name == 'GIN':
+        embeddings = []
+        for data in loader:
+            data = data.to(device)
+            _, emb = model(data.x, data.edge_index, data.batch, data.atm_idx)
+            embeddings.append(emb.cpu().numpy())
+        return np.concatenate(embeddings, axis=0)
+    elif model.name == 'GT':
+        embeddings = []
+        for data in loader:
+            nodes, edges, adj_mat, mask, values, labels, atm_idx, smiles_list, atm_cls = data
+            nodes, edges, adj_mat, mask, values, labels, atm_idx, atm_cls = \
+                nodes.to(device), edges.to(device), adj_mat.to(device), mask.to(device), values.to(device), labels.to(device), atm_idx.to(device), atm_cls.to(device)
+            # Write a loop to iterate through the batch and calculate the embeddings
+            # minibatch_size = 12
+            # embeddings = torch.zeros((nodes.size(0), config.hidden_channels)).to(device)
+            # for i in range(0, nodes.size(0), minibatch_size):
+            #     embeddings[i:i+minibatch_size] = net(nodes[i:i+minibatch_size], edges[i:i+minibatch_size], adj_mat[i:i+minibatch_size], mask[i:i+minibatch_size])
+            embeddings.append(model(nodes=nodes, edges=edges, adj_mat=adj_mat, mask=mask, atm_idx=atm_idx)[1].cpu().numpy())
+            return np.concatenate(embeddings, axis=0)
 
 def check_grad(model):
     """Check if the gradient of a model is explosive"""

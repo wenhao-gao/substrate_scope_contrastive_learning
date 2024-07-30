@@ -17,6 +17,7 @@ from sklearn.compose import TransformedTargetRegressor
 
 from torch_geometric.loader import DataLoader
 torch.autograd.set_detect_anomaly(True)
+from loader import SC_GTDataLoader
 from ipdb import set_trace as st
 
 test_doyle_smiles = [
@@ -75,10 +76,12 @@ test_doyle_dataset_c = [smiles_to_graph_substrate(smiles=data_doyle['smiles'][in
 def test_on_doyle(model, device):
     # try:
     model.eval()
-    if model.pool_method == 'c':
+    if model.name == 'GIN':
         test_doyle_loader = DataLoader(test_doyle_dataset_c, 64, shuffle=False)
+    elif model.name == 'GT':
+        test_doyle_loader = SC_GTDataLoader(test_doyle_dataset_c, 64, shuffle=False)
     else:
-        raise ValueError('Invalid pool_method type')
+        raise ValueError('Invalid model name')
     
     embeddings = get_embedding(model, test_doyle_loader, device)
     y = np.array(data_doyle['label'].to_list())
@@ -145,11 +148,13 @@ test_hammett_dataset_c = [smiles_to_graph_substrate(smiles=data_hammett['SMILES'
 
 @torch.no_grad()
 def test_on_hammett(model, device):
-    model.eval()
-    if model.pool_method == 'c':
+    model.eval()   
+    if model.name == 'GIN':
         test_loader = DataLoader(test_hammett_dataset_c, 64, shuffle=False)
+    elif model.name == 'GT':
+        test_loader = SC_GTDataLoader(test_hammett_dataset_c, 64, shuffle=False)
     else:
-        raise ValueError('Invalid pool_method type')
+        raise ValueError('Invalid model name')
     
     embeddings = get_embedding(model, test_loader, device)
     y = np.array(data_hammett['constant'].to_list())
@@ -207,10 +212,12 @@ test_autoqchem_dataset_c = [smiles_to_graph_substrate(smiles=data_autoqchem['SMI
 @torch.no_grad()
 def test_on_autoqchem_charge(model, device):
     model.eval()
-    if model.pool_method == 'c':
+    if model.name == 'GIN':
         test_loader = DataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
+    elif model.name == 'GT':
+        test_loader = SC_GTDataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
     else:
-        raise ValueError('Invalid pool_method type')
+        raise ValueError('Invalid model name')
     
     embeddings = get_embedding(model, test_loader, device)
 
@@ -263,10 +270,12 @@ def test_on_autoqchem_charge(model, device):
 @torch.no_grad()
 def test_on_autoqchem_nmr(model, device):
     model.eval()
-    if model.pool_method == 'c':
+    if model.name == 'GIN':
         test_loader = DataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
+    elif model.name == 'GT':
+        test_loader = SC_GTDataLoader(test_autoqchem_dataset_c, 64, shuffle=False)
     else:
-        raise ValueError('Invalid pool_method type')
+        raise ValueError('Invalid model name')
     
     embeddings = get_embedding(model, test_loader, device)
 

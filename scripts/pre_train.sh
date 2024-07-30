@@ -1,12 +1,20 @@
 #!/bin/bash  
 
+# export CUDA_VISIBLE_DEVICES=0 
+# python -u substrate_metric_learning/pre_train.py \
+#     --seed 0 \
+#     --epochs 5 \
+#     --wandb disabled \
+#     --dataset_path data/arylhalide_database_w_idx_min5.csv \
+#     --config_path configs/gt_hparams_default.yaml
+
 export CUDA_VISIBLE_DEVICES=0
 nohup python -u substrate_metric_learning/pre_train.py \
     --seed 0 \
-    --epochs 100 \
+    --epochs 750 \
     --wandb online \
     --dataset_path data/arylhalide_database_w_idx_min5.csv \
-    --config_path configs/hparams_default.yaml &> substrate_metric_learning_0.out&
+    --config_path configs/gt_hparams_default.yaml &> substrate_metric_learning_0.out&
 
 # export CUDA_VISIBLE_DEVICES=1
 # nohup python -u substrate_metric_learning/pre_train.py \

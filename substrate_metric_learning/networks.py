@@ -28,6 +28,8 @@ class Net(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers, pool='global'):
         super().__init__()
 
+        self.name = 'GIN'
+
         self.convs = torch.nn.ModuleList()
         for _ in range(num_layers):
             mlp = MLP([in_channels, hidden_channels, hidden_channels])
@@ -301,10 +303,12 @@ class GraphTransformer(nn.Module):
         norm_edges = False,
         rel_pos_emb = False,
         accept_adjacency_matrix = False,
+        mlp_hidden_channels = 64,
         out_channels = 1,
         pool = 'global',
     ):
         super().__init__()
+        self.name = 'GT'
         self.layers = ModuleList([])
         edge_dim = default(edge_dim, dim)
         self.norm_edges = nn.LayerNorm(edge_dim) if norm_edges else nn.Identity()
@@ -328,15 +332,15 @@ class GraphTransformer(nn.Module):
         self.pool_method = pool
         
         if pool == 'global':
-            self.mlp = MLP([dim, hidden_channels, out_channels],
+            self.mlp = MLP([dim, mlp_hidden_channels, out_channels],
                         norm=None, dropout=0.5)
             self.pool = global_add_pool
         elif pool == 'c':
-            self.mlp = MLP([dim, hidden_channels, out_channels],
+            self.mlp = MLP([dim, mlp_hidden_channels, out_channels],
                         norm=None, dropout=0.5)
             self.pool = local_pick_pool
         elif pool == 'cx':
-            self.mlp = MLP([dim*2, hidden_channels, out_channels],
+            self.mlp = MLP([dim*2, mlp_hidden_channels, out_channels],
                         norm=None, dropout=0.5)
             self.pool = local_pick_pool
 
@@ -345,7 +349,8 @@ class GraphTransformer(nn.Module):
         nodes,
         edges = None,
         adj_mat = None,
-        mask = None
+        mask = None,
+        atm_idx = None
     ):
         
         batch, seq, _ = nodes.shape
@@ -373,11 +378,11 @@ class GraphTransformer(nn.Module):
             masked_nodes = nodes * mask
             graphs = masked_nodes.sum(dim=1, keepdim=True)
         elif self.pool_method == 'c':
-            raise NotImplementedError
+            graphs = nodes.gather(1, atm_idx.to(torch.int64).unsqueeze(1).unsqueeze(2).expand(-1, -1, 133)).squeeze(1)
         else:
             raise NotImplementedError
 
-        return torch.flatten(self.mlp(graphs)), nodes, edges
+        return torch.flatten(self.mlp(graphs)), graphs, nodes, edges
     
 import rdkit
 from rdkit import Chem, RDLogger

@@ -103,7 +103,21 @@ class SubstrateTripletLoss(EmbeddingRegularizerMixin, ModuleWithRecordsReducerAn
             self.device = device
         
     def compute_loss(self, embeddings, values, labels, indices_tuple, ref_emb, ref_labels, smiles_list, atm_cls):
-
+        """
+        Calculate the loss using embeddings, labels, and indices_tuple
+        Args:
+            embeddings: tensor of size (batch_size, embedding_size), on cuda device
+            values: tensor of size (batch_size), on cuda device
+            labels: tensor of size (batch_size), on cuda device
+            indices_tuple: tuple of size 3 for triplets (anchors, positives, negatives)
+                            or size 4 for pairs (anchor1, postives, anchor2, negatives)
+                            Can also be left as None
+            ref_emb: tensor of size (batch_size, embedding_size), on cuda device
+            ref_labels: tensor of size (batch_size), on cuda device
+            smiles_list: list of SMILES strings
+            atm_cls: tensor of size (batch_size), on cuda device, dtype=torch.int64
+        Returns: the losses
+        """
         c_f.labels_or_indices_tuple_required(labels, indices_tuple)
         if not self.same_halogen_negative:
             indices_tuple = lmu.convert_to_triplets(
